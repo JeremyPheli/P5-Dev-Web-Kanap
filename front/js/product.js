@@ -1,58 +1,153 @@
 
-/* On récupère l'ID avec les paramètres de l'URL */
-const idItems = new URL(window.location.href).searchParams.get("id");
-console.log(idItems);
+// Récupération de l'url et du paramètre
+let params = new URL(document.location).searchParams;
 
-/* On contacte l'API pour récupérer un article via son ID */
-fetch("http://localhost:3000/api/products/" + idItems)
-    .then(function (res) {
-        return res.json();
-    })
+// Récupération de l'id
+let productId = params.get("id");
 
-    /* Fonction de récupération des informations de l'article */
-    .then(function (article) {
-        displayProduct(article);
-    })
+// Fonction qui permet de récupérer les données de l'API avec l'id du Produit concerné
+async function getProduct() {
+    try {
+        const response = await fetch(
+            "http://localhost:3000/api/products/" + productId
+        );
+        if (response.ok) {
+            const data = await response.json();
+            return displaySelectedProduct(data);
+        } else {
+            throw new Error("Échec du chargement de l'API");
+        }
+    } catch (error) {
+        console.error(error.message);
+    }
+}
 
-    /* Fonction d'affichage d'erreur */
-    .catch((error) => {
-        console.log(error, "Fetch failed");
+// Fonction qui permet d'insérer les données de l'API dans le DOM
+function displaySelectedProduct(item) {
 
-    });
-
-/* Création de la fonction permettant l'affichage des données de l'article */
-const displayProduct = (article) => {
-
-    /* Affichage de l'image de l'article choisi */
+    // Insertion de l'image
     let productImg = document.createElement("img");
+    productImg.src = item.imageUrl;
+    productImg.alt = item.altTxt;
     document.querySelector(".item__img").appendChild(productImg);
-    productImg.src = article.imageUrl;
-    productImg.alt = article.altTxt;
 
-    /* Affichage du nom de l'article */
-    let productName = document.getElementById("title");
-    productName.innerHTML = article.name;
+    // Insertion du nom du produit
+    let productTitle = document.getElementById("title");
+    productTitle.innerHTML = item.name;
 
-    /* Affichage du prix de l'article */
+    // Insertion du prix
     let productPrice = document.getElementById("price");
-    productPrice.innerHTML = article.price;
+    productPrice.innerHTML = item.price;
 
-    /* Affichage de la description de l'article */
+    // Insertion de la description
     let productDescription = document.getElementById("description");
-    productDescription.innerHTML = article.description;
+    productDescription.innerHTML = item.description;
 
-    /* Choix de la couleur de l'article */
-    for (let colors of article.colors) {
-        console.log(colors);
-        let productsColors = document.createElement("option");
-        document.querySelector("#colors").appendChild(productsColors);
-        productsColors.value = colors;
-        productsColors.innerHTML = colors;
+    // Insertion des options de couleurs
+    for (let color of item.colors) {
+        let productColors = document.createElement("option");
+        productColors.setAttribute("value", color);
+        productColors.innerHTML = color;
+        document.querySelector("#colors").appendChild(productColors);
+    }
+    // Déclencher l'évènement sur le bouton "ajouter au panier" grâce au fonction checkCart()
+    const addButton = document.getElementById("addToCart");
+    addButton.addEventListener("click", checkCart);
+}
+
+// Fonction checkCart permet de vérifer plusieurs conditions avant d'ajouter le produit au panier
+function checkCart() {
+    let productColor = document.querySelector("#colors").value;
+    let productQuantity = Number(document.querySelector("#quantity").value);
+    // Création d'un objet contenant l'id, la couleur et la description du produit  
+    let productDetails = {
+        id: productId,
+        color: productColor,
+        quantity: productQuantity,
+    };
+
+    // Création de deux variables pour gérér l'erreur dans la condition
+    let error = false;
+    let msgError = "";
+
+    // Si aucune couleur sélectionnée
+    if (productColor == "") {
+        msgError += "Veuillez sélectionner une couleur";
+        error = true;
+        // Si quantité est un nombre décimal
+    } else if (!Number.isInteger(productQuantity)) {
+        msgError +=
+            "Veuillez renseigner un nombre entier compris entre 1 et 100";
+        error = true;
+        // Si quantité = 0
+    } else if (productQuantity == 0) {
+        msgError += "Veuillez renseigner une quantité";
+        error = true;
+        // Si quantité > 100
+    } else if (productQuantity > 100) {
+        msgError += "La quantité maximale autorisée est de 100";
+        error = true;
+        // Si quantité < 0
+    } else if (productQuantity < 0) {
+        msgError += "Veuillez ne pas saisir de valeur négative!";
+        error = true;
+    }
+    // Si il y a une erreur, affiche le message d'erreur et annule l'action
+    if (error) {
+        alert(msgError);
+        return;
     }
 
-};
+    // Appel de la fonction addToCart en passant l'objet productDetails commme argument
+    addToCart(productDetails);
 
-/* Gestion du panier */
+}
+
+// Fonction qui permet d'ajouter un ou plusieurs produit au panier
+function addToCart(productDetails) {
+    // // Récupération des produits du LocalStorage
+    // JSON String transformé en Objet Javascript
+    let productsInLocalStorage = JSON.parse(localStorage.getItem("cartItems"));
+    // Fenêtre pop-up de confirmation d'ajout du produit au panier et de redirection
+    const popupConfirmation = function () {
+        if (
+            confirm(
+                "Le produit à bien été ajouté au panier !\nPour consulter votre panier, Cliquez sur OK !"
+            )
+        ) {
+            window.location.href = "cart.html";
+        }
+    };
+    // Importation dans le local storage
+    //  Si le panier contient déjà au moins 1 article de même id et même couleur
+    if (productsInLocalStorage) {
+        const resultFind = productsInLocalStorage.find((product) => {
+            console.log(product)
+            return (
+                product.id === productDetails.id && product.color === productDetails.color
+            );
+        });
+        // Si c'est le cas, incrémenter la quantité du produit en question
+        if (resultFind) {
+            let updateQuantity = productDetails.quantity + resultFind.quantity;
+            resultFind.quantity = updateQuantity;
+            // Si le panier contient des produits différents
+        } else {
+            productsInLocalStorage.push(productDetails);
+        }
+        // Si le panier est vide
+    } else {
+        productsInLocalStorage = [];
+        productsInLocalStorage.push(productDetails);
+    }
+    // Objet Javascprit transformé en JSON String
+    localStorage.setItem("cartItems", JSON.stringify(productsInLocalStorage));
+    popupConfirmation();
+}
+
+getProduct();
+
+
 
 
 
