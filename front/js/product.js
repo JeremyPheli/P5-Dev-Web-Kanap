@@ -122,7 +122,6 @@ function addToCart(productDetails) {
     //  Si le panier contient déjà au moins 1 article de même id et même couleur
     if (productsInLocalStorage) {
         const resultFind = productsInLocalStorage.find((product) => {
-            console.log(product)
             return (
                 product.id === productDetails.id && product.color === productDetails.color
             );
